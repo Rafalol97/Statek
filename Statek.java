@@ -8,6 +8,8 @@ public class Statek extends JPanel {
     volatile Semaphore mostek;
     volatile Semaphore obecni;
     volatile Semaphore plynie = new Semaphore(1);
+    volatile Semaphore stoi = new Semaphore(1);
+    volatile Semaphore kolejka  = new Semaphore(16);
     volatile Semaphore mutex = new Semaphore(1);
 
     volatile LinkedList<Integer> mojeMiejsce;
@@ -35,6 +37,8 @@ public class Statek extends JPanel {
     int [] yTrojkat2 = new int[3];
     int xStatek= 700; int yStatek= 200;
     int statekWidth = 150,statekHeight=300;
+    int yStartowe = yStatek;
+
     public Statek(int iloscPasazerow, int przejscia, int miejscaNaStatku, int miejscaNaMostku) {
         mojeMiejsce = new LinkedList<>();
         this.miejsceNaStatku = new LinkedList<>();
@@ -49,11 +53,7 @@ public class Statek extends JPanel {
         liczbaMiejscNaStatku = miejscaNaStatku;
         liczbaMiejscNaMostku = miejscaNaMostku;
         licznikBezpeczenstwa = iloscPasazerow * przejscia;
-        try {
-            plynie.acquire();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+
 
         pozycjeNaMostku = new LinkedList<>();
         int xStartowy = xStatek-10,yStartowy=460;
@@ -69,6 +69,12 @@ public class Statek extends JPanel {
         listaPasazerow= new LinkedList<>();
         TablicaPozycji = new Integer[16][3];
         initTablicaPozycji();
+        try {
+            plynie.acquire();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
 
     }
 
@@ -106,17 +112,31 @@ public class Statek extends JPanel {
     }
 
     public void wsiadanie(int nr) {
+        try {
+            kolejka.acquire();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
         Integer[] temp = new Integer[2];
         temp[0]=nr;
         temp[1]=ostatnieMiejsceWKolejce;
-        TablicaPozycji[ostatnieMiejsceWKolejce][2]=nr;
+//        TablicaPozycji[ostatnieMiejsceWKolejce][2]=nr;
 
         ostatnieMiejsceWKolejce++;
         listaPasazerow.add(temp);
         try {
             obecni.acquire();
+
         } catch (InterruptedException e) {
             e.printStackTrace();
+        }
+        if(obecni.availablePermits()==liczbaMiejscNaStatku-2){
+            try {
+                stoi.acquire();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
 
         try {
@@ -124,6 +144,8 @@ public class Statek extends JPanel {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+        kolejka.release();
 
         try {
             mutex.acquire();
@@ -170,6 +192,11 @@ public class Statek extends JPanel {
 
         licznik++;
         if (liczbaJuzObecnych == liczbaMiejscNaStatku || licznik == licznikBezpeczenstwa){
+            try {
+                Thread.sleep(3000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             plynie.release();
         }
     }
@@ -177,6 +204,7 @@ public class Statek extends JPanel {
 
     public void kapitanStart() {
             try {
+
                 plynie.acquire();
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -184,7 +212,17 @@ public class Statek extends JPanel {
 
         System.out.println("Odpływam");
         //animacja odplywu statku
+        for(int y = yStatek;y+statekHeight*2>0;y-=10){
+            this.repaint();
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
+
+            yStatek=y;
+        }
         //tutaj moze byc petla zwalniajace obecnych jesli chcesz zeby wchodzili jak juz nowy przyplywa
 
 
@@ -194,8 +232,17 @@ public class Statek extends JPanel {
         }
         else{
             //animacja przyplywu nowego statku
+            for(int y = 750;y>yStartowe;y-=10){
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                yStatek=y;
+                this.repaint();
+            }
+
         }
-        plynie.release();
     }
 
     public void kapitanStop() {
@@ -207,11 +254,9 @@ public class Statek extends JPanel {
             obecni.release();
             miejsceNaStatku.set(i, -1);
         }
-        try {
-            plynie.acquire();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        stoi.release();
+
+
     }
     public void initTablicaPozycji(){
         int xStart =500-10,yStart = 450;
@@ -228,7 +273,39 @@ public class Statek extends JPanel {
             TablicaPozycji[i][2]=-1;
             yOffset+=40;
         }
+    }
+    public void przesunKolejke(){
+        for(int i=1;i<TablicaPozycji.length;i++){
+            moveKlocek(TablicaPozycji[i][0],TablicaPozycji[i][1],TablicaPozycji[i-1][0],TablicaPozycji[i-1][1]);
+        }
+    }
+    public void moveKlocek( int xstart,int ystart,int xstop,int ystop){
+        int tempx=xstart;
+        int tempy= ystart;
 
+        while(tempx!=xstop&&tempy!=ystop){
+            if(tempx>xstop){
+                tempx--;
+            }
+            else if( tempx<xstop){
+                tempx++;
+            }
+            else{
+                //do nothing
+            }
+            if(tempy>ystop){
+                tempy--;
+            }
+            else if( tempy<ystop){
+                tempy++;
+            }
+            else{
+                //do nothing
+            }
+
+
+
+        }
 
     }
 }
