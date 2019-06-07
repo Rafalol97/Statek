@@ -22,7 +22,11 @@ public class Pasazer extends Thread {
                 e.printStackTrace();
             }
 
-            statek.wsiadanie(numer);
+            try {
+                statek.wsiadanie(numer);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
             statek.wysiadanie(numer);
         }

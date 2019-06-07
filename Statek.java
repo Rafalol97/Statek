@@ -11,9 +11,13 @@ public class Statek extends JPanel {
     volatile Semaphore stoi = new Semaphore(1);
     volatile Semaphore kolejka  = new Semaphore(16);
     volatile Semaphore mutex = new Semaphore(1);
-
-    volatile LinkedList<Integer> mojeMiejsce;
+    volatile Semaphore mutexZaklepanieMiejscaWKolejcePoczatkowej = new Semaphore(1);
+    volatile Semaphore mutexPrzesun = new Semaphore(1);
+    volatile Semaphore mutexPrzesunPoczatek = new Semaphore(1);
+    volatile int mojeMiejsce;
     volatile int miejsceWKolejce = 1;
+    volatile int OstatnieMiejsceWKolejceDostepne =0;
+
 
     volatile LinkedList<Integer> miejsceNaStatku;
     volatile int następneMiejsce = 0;
@@ -23,13 +27,20 @@ public class Statek extends JPanel {
 
     volatile int liczbaJuzObecnych;
     volatile static int ostatnieMiejsceWKolejce=0;
+    volatile static int ostatnieMiejsceNaMostku =0;
     volatile int licznikBezpeczenstwa;
     volatile int licznik = 0;
 
     LinkedList<Integer> listaPasazerow;
-    LinkedList<Integer[]> pozycjeNaMostku;
 
+    //Tablice miejsc odpowiednich
     volatile static Integer TablicaPozycji[][];
+    volatile static Integer TablicaPozycjiMostek[][];
+    volatile static Integer TablicaPozycjiStatek[][];
+    //Listy wątków i ich miejsca w kolejce
+    volatile static LinkedList<Integer> listaPozycjiWKolejce;
+    volatile static LinkedList<Integer> listaPozycjiNaMostku;
+    volatile static LinkedList<Integer> listaPozycjiNaStatku;
     int [] xTrojkat1 = new int[3];
     int [] xTrojkat2 = new int[3];
 
@@ -39,15 +50,13 @@ public class Statek extends JPanel {
     int statekWidth = 150,statekHeight=300;
     int yStartowe = yStatek;
 
+    int xKolejkaMostek=460,yKolejkaMostek =460;
+    boolean malujPrzejscie,malujNaMostku;
+
+    int xDodanego,yDodanego;
+    int xNaMostku,yNaMostku=460;
+
     public Statek(int iloscPasazerow, int przejscia, int miejscaNaStatku, int miejscaNaMostku) {
-        mojeMiejsce = new LinkedList<>();
-        this.miejsceNaStatku = new LinkedList<>();
-        for (int i = 0; i < iloscPasazerow; i++) {
-            this.mojeMiejsce.add(-1);
-        }
-        for (int i = 0; i < miejscaNaStatku; i++) {
-            this.miejsceNaStatku.add(-1);
-        }
         this.mostek = new Semaphore(miejscaNaMostku);
         this.obecni = new Semaphore(miejscaNaStatku);
         liczbaMiejscNaStatku = miejscaNaStatku;
@@ -55,19 +64,14 @@ public class Statek extends JPanel {
         licznikBezpeczenstwa = iloscPasazerow * przejscia;
 
 
-        pozycjeNaMostku = new LinkedList<>();
-        int xStartowy = xStatek-10,yStartowy=460;
-        int offsetX=0;
-        for(int i=0;i<liczbaMiejscNaMostku;i++){
-            Integer temp [] = new Integer[3];
-            temp[0]=xStartowy-offsetX;
-            temp[1]=yStartowy;
-            temp[2]=-1;
-            offsetX+=40;
-            pozycjeNaMostku.add(temp);
-        }
-        listaPasazerow= new LinkedList<>();
-        TablicaPozycji = new Integer[16][3];
+        listaPozycjiWKolejce = new LinkedList<>();
+        listaPozycjiNaStatku = new LinkedList<>();
+        listaPozycjiNaMostku = new LinkedList<>();
+
+
+        TablicaPozycji = new Integer[16][2];
+        TablicaPozycjiMostek = new Integer[liczbaMiejscNaMostku][2];
+        TablicaPozycjiStatek = new Integer[liczbaMiejscNaStatku][2];
         initTablicaPozycji();
         try {
             plynie.acquire();
@@ -107,98 +111,150 @@ public class Statek extends JPanel {
         g.setColor(Color.black);
         g.fillPolygon(xTrojkat1,yTrojkat1,3);
         g.fillPolygon(xTrojkat2,yTrojkat2,3);
-        g.setColor(Color.BLACK);
         g.fillRect(xStatek,yStatek,statekWidth,statekHeight);
+        g.setColor(Color.RED);
 
         //Pasazery
-        for(Integer[] x: TablicaPozycji){
-               // if(x[2]!=-1) {
-                    g.fillRect(x[0], x[1], 30, 30);
-            //    }
+
+        for(int i=0;i<listaPozycjiWKolejce.size();i++){
+            if(malujNaMostku&&i==0)i++;
+            g.fillRect(TablicaPozycji[i][0], TablicaPozycji[i][1], 30, 30);
+
         }
+
+        for(int i=0;i<listaPozycjiNaMostku.size();i++){
+
+            g.fillRect(TablicaPozycjiMostek[i][0], TablicaPozycjiMostek[i][1], 30, 30);
+
+        }
+        for(int i=0;i<listaPozycjiNaStatku.size();i++){
+
+            g.fillRect(TablicaPozycjiStatek[i][0], TablicaPozycjiStatek[i][1], 30, 30);
+
+        }
+        if(malujPrzejscie){
+            g.fillRect(xDodanego,yDodanego,30,30);
+        }
+        if(malujNaMostku){
+            g.fillRect(xNaMostku,yNaMostku,30,30);
+        }
+
 
     }
 
-    public void wsiadanie(int nr) {
-        try {
-            kolejka.acquire();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        TablicaPozycji[ostatnieMiejsceWKolejce][2] = nr;
+    public void wsiadanie(int nr) throws InterruptedException {
+
+        //Dostanie sie do kolejki
+        kolejka.acquire();
+
+
+        //Zaklepanie miejsce w kolejce
+
+
+        //przesun klocek tak dlugo az nie bedzie na dobrym miejscu
+
+
+        mutexPrzesunPoczatek.acquire();
+
+        mojeMiejsce=ostatnieMiejsceWKolejce;
         ostatnieMiejsceWKolejce++;
-        this.repaint();
-        try {
-            obecni.acquire();
+        przesunPasazeraNaZaklepaneMiejsce(mojeMiejsce,nr);
 
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        mutexPrzesunPoczatek.release();
+
+        //Możliwość wejścia na statek
+        obecni.acquire();
+
+        //Statek nie ruszy tak długo jak nie będzie wystarczającej ilości miejsc
         if(obecni.availablePermits()==liczbaMiejscNaStatku-2){
-            try {
-                stoi.acquire();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            stoi.acquire();
         }
 
-        try {
-            mostek.acquire();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        kolejka.release();
+        //Zaklepanie wejścia na mostek
+        mostek.acquire();
+       //Zaklepanie miejsca na mostku i przesunięcie kolejki
+       // przesunKolejke();
 
+        mutex.acquire();
 
-
-        try {
-            mutex.acquire();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        int numerTemp = TablicaPozycji[0][2];
-        przesunKolejke();
-        TablicaPozycji[ostatnieMiejsceWKolejce-1][2]=-1;
+        listaPozycjiWKolejce.removeFirst();
         ostatnieMiejsceWKolejce--;
 
-        mojeMiejsce.set(nr, miejsceWKolejce);
-        miejsceWKolejce++;
-
+        przesunPasazeraNaZaklepaneMiejsceNaMostku(ostatnieMiejsceNaMostku,nr);
+        przesunKolejke();
+        //TODO przesun pasazera na odpowiednie miejsce na mostku
+        ostatnieMiejsceNaMostku++;
         mutex.release();
-
-        System.out.println("Wsiadam");
+        //Oddanie miejsce w zewnętrznej kolejce
+        kolejka.release();
+        Thread.sleep(5000);
         //animacja wchodzenia na mostek
+        mutex.acquire();
+        System.out.println("Wsiadam");
 
-
-        try {
-
-            mutex.acquire();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
+        listaPozycjiNaStatku.add(nr);
+        //TODO przesun pasazera na odpowiednie miejsce na statku
+        listaPozycjiNaMostku.removeFirst();
+        ostatnieMiejsceNaMostku--;
         //zaklepanie miejsce na statku
-        miejsceNaStatku.set(następneMiejsce, nr);
-        następneMiejsce++;
-
-        mojeMiejsce.set(nr, -1);
-        miejsceWKolejce--;
-
         mutex.release();
-
-        //animacja wejscia na statek
 
         mostek.release();
 
     }
+
+    public void przesunPasazeraNaZaklepaneMiejsce(int miejsce,int nr){
+
+
+        xDodanego=140;yDodanego=0;
+        malujPrzejscie= true;
+        while(TablicaPozycji[miejsce][0]!=xDodanego||TablicaPozycji[miejsce][1]!=yDodanego){
+            if (TablicaPozycji[miejsce][1]>yDodanego) {
+                yDodanego++;
+
+            }
+            else if (TablicaPozycji[miejsce][0] > xDodanego) {
+                xDodanego++;
+            }
+            try {
+                Thread.sleep(3);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        }
+        malujPrzejscie= false;
+        listaPozycjiWKolejce.add(nr);
+
+    }
+    public void przesunPasazeraNaZaklepaneMiejsceNaMostku(int miejsce,int nr){
+        xNaMostku=460;
+        malujNaMostku= true;
+        while(TablicaPozycjiMostek[miejsce][0]!=xNaMostku){
+            if (TablicaPozycjiMostek[miejsce][0] > xNaMostku) {
+                xNaMostku++;
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        }
+        malujNaMostku= false;
+        listaPozycjiNaMostku.add(nr);
+
+    }
+
+
 
     public void wysiadanie(int nr) {
 
         //dokonczenie animacji wsiadania
 
         liczbaJuzObecnych++;
-
         licznik++;
+        System.out.println("hehe");
         if (liczbaJuzObecnych == liczbaMiejscNaStatku || licznik == licznikBezpeczenstwa){
             try {
                 Thread.sleep(3000);
@@ -208,8 +264,6 @@ public class Statek extends JPanel {
             plynie.release();
         }
     }
-
-
     public void kapitanStart() {
             try {
 
@@ -217,11 +271,15 @@ public class Statek extends JPanel {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         System.out.println("Odpływam");
         //animacja odplywu statku
         for(int y = yStatek;y+statekHeight*2>0;y-=10){
-            this.repaint();
+
             try {
                 Thread.sleep(10);
             } catch (InterruptedException e) {
@@ -232,7 +290,6 @@ public class Statek extends JPanel {
             yStatek=y;
         }
         //tutaj moze byc petla zwalniajace obecnych jesli chcesz zeby wchodzili jak juz nowy przyplywa
-
 
 
         if(licznik == licznikBezpeczenstwa){
@@ -247,12 +304,11 @@ public class Statek extends JPanel {
                     e.printStackTrace();
                 }
                 yStatek=y;
-                this.repaint();
+
             }
 
         }
     }
-
     public void kapitanStop() {
 
         liczbaJuzObecnych = 0;
@@ -260,55 +316,84 @@ public class Statek extends JPanel {
 
         for (int i = 0; i < liczbaMiejscNaStatku; i++) {
             obecni.release();
-            miejsceNaStatku.set(i, -1);
         }
+        listaPozycjiNaStatku.clear();
         stoi.release();
 
 
     }
+
     public void initTablicaPozycji(){
         int xStart =500-40,yStart = 460;
         int xOffset=0,yOffset=0;
         for(int i=0;i<8;i++){
             TablicaPozycji[i][0]=xStart-xOffset;
             TablicaPozycji[i][1]=yStart;
-            TablicaPozycji[i][2]=-1;
+
             xOffset+=40;
         }
 
         for(int i=8;i<16;i++){
             TablicaPozycji[i][0]=xStart-xOffset;
             TablicaPozycji[i][1]=yStart-yOffset;
-            TablicaPozycji[i][2]=-1;
+
             yOffset+=40;
         }
+        xOffset=0;
+        int xStartMostek= xStatek-40;
+        int yStartMostek= 460;
+        for(int i=0;i<liczbaMiejscNaMostku;i++){
+            TablicaPozycjiMostek[i][0]=xStartMostek-xOffset;
+            TablicaPozycjiMostek[i][1]=yStartMostek;
+            xOffset+=40;
+        }
+
+        //TODO dodaj przypiswanie pozycji na statku
+        xOffset=0;
+        xStartMostek= xStatek+40;
+        yStartMostek= 460;
+        for(int i=0;i<liczbaMiejscNaStatku;i++){
+            TablicaPozycjiStatek[i][0]=xStartMostek-xOffset;
+            TablicaPozycjiStatek[i][1]=yStartMostek;
+            xOffset+=0;
+        }
+
     }
+
+
     public void przesunKolejke(){
+        try {
+            mutexPrzesun.acquire();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         int xStop=TablicaPozycji[0][0],yStop=TablicaPozycji[0][1];
-        for(int i=1;i<TablicaPozycji.length;i++){
+        for(int i=1;i<listaPozycjiWKolejce.size();i++){
 
             int temp1=TablicaPozycji[i][0],temp2=TablicaPozycji[i][1];
             while (!TablicaPozycji[i][0].equals(xStop)|| !TablicaPozycji[i][1].equals(yStop) ) {
-                if (TablicaPozycji[i][1] >yStop) {
-                 //   TablicaPozycji[i][1]--;
 
-                }
-                else if (TablicaPozycji[i][1] <yStop) {
+                if (TablicaPozycji[i][1] <yStop) {
                     TablicaPozycji[i][1]++;
 
                 }
-                if (TablicaPozycji[i][0] > xStop) {
-                 //   TablicaPozycji[i][0]--;
-                } else if (TablicaPozycji[i][0] < xStop) {
-                    TablicaPozycji[i][0]++;
-                }
+                 if (TablicaPozycji[i][0] < xStop) {
+                     TablicaPozycji[i][0]++;
+                 }
 
                 try {
-                    Thread.sleep(1);
+                    if (listaPozycjiWKolejce.size() > 7){
+                        Thread.sleep(1);
+                    }
+
+                    else{
+                        Thread.sleep(3);
+
+                    }
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                this.repaint();
+
                 System.out.println("rysuje");
             }
             xStop=temp1;yStop=temp2;
@@ -316,9 +401,32 @@ public class Statek extends JPanel {
 
         }
         resetTablica();
-
-
+        mutexPrzesun.release();
     }
+
+    public void przesunKolejkeMostek() {
+        int xStop = TablicaPozycjiMostek[0][0];
+        for (int i = 1; i < TablicaPozycjiMostek.length; i++) {
+
+            int temp1 = TablicaPozycjiMostek[i][0];
+            while (!TablicaPozycjiMostek[i][0].equals(xStop)) {
+                if (TablicaPozycjiMostek[i][0] < xStop) {
+                    TablicaPozycjiMostek[i][0]++;
+                }
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+            }
+            xStop = temp1;
+
+
+        }
+        resetTablicaMostek();
+    }
+
     public void resetTablica()
     {
         int xStart =500-40,yStart = 460;
@@ -335,6 +443,20 @@ public class Statek extends JPanel {
             TablicaPozycji[i][1]=yStart-yOffset;
             yOffset+=40;
         }
+
+
     }
+    public void resetTablicaMostek(){
+        int  xOffset=0;
+        int xStartMostek= xStatek-40;
+        int yStartMostek= 460;
+        for(int i=0;i<liczbaMiejscNaMostku;i++){
+            TablicaPozycjiMostek[i][0]=xStartMostek-xOffset;
+            TablicaPozycjiMostek[i][1]=yStartMostek;
+
+            xOffset+=40;
+        }
+    }
+
 }
 
