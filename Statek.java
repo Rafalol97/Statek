@@ -22,11 +22,11 @@ public class Statek extends JPanel {
     volatile int liczbaMiejscNaMostku;
 
     volatile int liczbaJuzObecnych;
-    volatile static int ostatnieMiejsceWKolejce;
+    volatile static int ostatnieMiejsceWKolejce=0;
     volatile int licznikBezpeczenstwa;
     volatile int licznik = 0;
 
-    LinkedList<Integer[]> listaPasazerow;
+    LinkedList<Integer> listaPasazerow;
     LinkedList<Integer[]> pozycjeNaMostku;
 
     volatile static Integer TablicaPozycji[][];
@@ -80,6 +80,10 @@ public class Statek extends JPanel {
 
     public void paint(Graphics g) {
         super.paint(g);
+
+        g.setColor(Color.BLUE);
+        g.fillRect(600,0,getWidth(),getHeight());
+
         //Most
         g.setColor(Color.decode("0x6C4B36"));
         g.fillRect(500,450,200,50);
@@ -103,11 +107,15 @@ public class Statek extends JPanel {
         g.setColor(Color.black);
         g.fillPolygon(xTrojkat1,yTrojkat1,3);
         g.fillPolygon(xTrojkat2,yTrojkat2,3);
-        g.setColor(Color.BLUE);
+        g.setColor(Color.BLACK);
         g.fillRect(xStatek,yStatek,statekWidth,statekHeight);
 
         //Pasazery
-
+        for(Integer[] x: TablicaPozycji){
+               // if(x[2]!=-1) {
+                    g.fillRect(x[0], x[1], 30, 30);
+            //    }
+        }
 
     }
 
@@ -117,14 +125,9 @@ public class Statek extends JPanel {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
-        Integer[] temp = new Integer[2];
-        temp[0]=nr;
-        temp[1]=ostatnieMiejsceWKolejce;
-//        TablicaPozycji[ostatnieMiejsceWKolejce][2]=nr;
-
+        TablicaPozycji[ostatnieMiejsceWKolejce][2] = nr;
         ostatnieMiejsceWKolejce++;
-        listaPasazerow.add(temp);
+        this.repaint();
         try {
             obecni.acquire();
 
@@ -144,14 +147,19 @@ public class Statek extends JPanel {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
         kolejka.release();
+
+
 
         try {
             mutex.acquire();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        int numerTemp = TablicaPozycji[0][2];
+        przesunKolejke();
+        TablicaPozycji[ostatnieMiejsceWKolejce-1][2]=-1;
+        ostatnieMiejsceWKolejce--;
 
         mojeMiejsce.set(nr, miejsceWKolejce);
         miejsceWKolejce++;
@@ -259,7 +267,7 @@ public class Statek extends JPanel {
 
     }
     public void initTablicaPozycji(){
-        int xStart =500-10,yStart = 450;
+        int xStart =500-40,yStart = 460;
         int xOffset=0,yOffset=0;
         for(int i=0;i<8;i++){
             TablicaPozycji[i][0]=xStart-xOffset;
@@ -267,46 +275,66 @@ public class Statek extends JPanel {
             TablicaPozycji[i][2]=-1;
             xOffset+=40;
         }
+
         for(int i=8;i<16;i++){
-            TablicaPozycji[i][0]=xStart;
+            TablicaPozycji[i][0]=xStart-xOffset;
             TablicaPozycji[i][1]=yStart-yOffset;
             TablicaPozycji[i][2]=-1;
             yOffset+=40;
         }
     }
     public void przesunKolejke(){
+        int xStop=TablicaPozycji[0][0],yStop=TablicaPozycji[0][1];
         for(int i=1;i<TablicaPozycji.length;i++){
-            moveKlocek(TablicaPozycji[i][0],TablicaPozycji[i][1],TablicaPozycji[i-1][0],TablicaPozycji[i-1][1]);
+
+            int temp1=TablicaPozycji[i][0],temp2=TablicaPozycji[i][1];
+            while (!TablicaPozycji[i][0].equals(xStop)|| !TablicaPozycji[i][1].equals(yStop) ) {
+                if (TablicaPozycji[i][1] >yStop) {
+                 //   TablicaPozycji[i][1]--;
+
+                }
+                else if (TablicaPozycji[i][1] <yStop) {
+                    TablicaPozycji[i][1]++;
+
+                }
+                if (TablicaPozycji[i][0] > xStop) {
+                 //   TablicaPozycji[i][0]--;
+                } else if (TablicaPozycji[i][0] < xStop) {
+                    TablicaPozycji[i][0]++;
+                }
+
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                this.repaint();
+                System.out.println("rysuje");
+            }
+            xStop=temp1;yStop=temp2;
+
+
         }
+        resetTablica();
+
+
     }
-    public void moveKlocek( int xstart,int ystart,int xstop,int ystop){
-        int tempx=xstart;
-        int tempy= ystart;
+    public void resetTablica()
+    {
+        int xStart =500-40,yStart = 460;
+        int xOffset=0,yOffset=0;
+        for(int i=0;i<8;i++){
+            TablicaPozycji[i][0]=xStart-xOffset;
+            TablicaPozycji[i][1]=yStart;
 
-        while(tempx!=xstop&&tempy!=ystop){
-            if(tempx>xstop){
-                tempx--;
-            }
-            else if( tempx<xstop){
-                tempx++;
-            }
-            else{
-                //do nothing
-            }
-            if(tempy>ystop){
-                tempy--;
-            }
-            else if( tempy<ystop){
-                tempy++;
-            }
-            else{
-                //do nothing
-            }
-
-
-
+            xOffset+=40;
         }
 
+        for(int i=8;i<16;i++){
+            TablicaPozycji[i][0]=xStart-xOffset;
+            TablicaPozycji[i][1]=yStart-yOffset;
+            yOffset+=40;
+        }
     }
 }
 
