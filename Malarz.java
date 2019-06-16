@@ -8,8 +8,9 @@ public class Malarz extends Thread {
     public void run(){
         while(running) {
             start = System.nanoTime();
-            statek.repaint();
-            System.out.println(System.nanoTime() - start);
+
+         ;//   statek.repaint();
+         //   System.out.println(System.nanoTime() - start);
         }
         statek.setVisible(false);
     }

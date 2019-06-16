@@ -4,11 +4,14 @@ import java.util.Random;
 public class Main {
     public static void main(String[] args) throws InterruptedException {
         Random rng = new Random();
-        int liczbaPasazerow =200;
-        int liczbaPrzejsc =2;
-        int miejscNaStatku = 6;
-        int miejscNaMostku =3;
+        int liczbaPasazerow =1000;
+        int liczbaPrzejsc =1;
+        int miejscNaStatku = 15;
+        int miejscNaMostku =4;
         Statek statek = new Statek(liczbaPasazerow, liczbaPrzejsc,miejscNaStatku,miejscNaMostku);
+        Statek.liczbaPasazerow = liczbaPasazerow;
+        Statek.liczbaPozostalychMiejscNaStatku = miejscNaStatku;
+        Statek.liczbaPozostalychMiejscNaMostku = miejscNaMostku;
         Kapitan kapitan = new Kapitan(statek);
         Malarz malarz =new  Malarz(statek);
         kapitan.start();
@@ -20,16 +23,20 @@ public class Main {
         frame.setResizable(false);
         malarz.start();
         Pasazer[] pasazerowie = new Pasazer[liczbaPasazerow];
-
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         for(int i = 0; i < liczbaPasazerow; i++){
             pasazerowie[i] = new Pasazer(statek, i, liczbaPrzejsc, rng);
             pasazerowie[i].start();
         }
-
+        kapitan.join();
+        malarz.join();
         for(int i = 0; i < liczbaPasazerow; i++){
             pasazerowie[i].join();
         }
-        kapitan.join();
-        malarz.join();
+
     }
 }
